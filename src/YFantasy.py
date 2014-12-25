@@ -2,9 +2,10 @@ from YSession import YSession
 
 def main():
 	session = YSession()
-	session.set_active('nhl')
-	session.get_league_IDs()
-
+	games = session.get_active_games()
+	print games
+	session.get_leagues(games['nhl'])
+	# session.games['nhl'].get_leagues()
 
 if __name__ == "__main__":
     main()
