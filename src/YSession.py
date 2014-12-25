@@ -2,6 +2,8 @@ from YAuth import YAuth
 from YObjects import YGame, YLeague
 import json
 
+BASE_URL = 'http://fantasysports.yahooapis.com/fantasy/v2/'
+
 class YSession:
 
 	def __init__(self):
@@ -9,7 +11,8 @@ class YSession:
 		self.session = YAuth().authorize()
 
 	def api_call(self,url):
-		return json.loads(self.session.get(url, params={'format': 'json'}).content)
+		full_url = BASE_URL + url
+		return json.loads(self.session.get(full_url, params={'format': 'json'}).content)
 
 	'''
 	Game Functions
@@ -45,7 +48,7 @@ class YSession:
 		return games
 
 	def get_active_games(self):
-		data = json.loads(self.session.get('users;use_login=1/games', params={'format': 'json'}).content)
+		data = self.api_call('users;use_login=1/games')
 		games = {}
 		games_json = data['fantasy_content']['users']['0']['user'][1]['games']
 		for i in games_json.keys():
@@ -62,21 +65,74 @@ class YSession:
 					)
 		return games
 
+	'''
+	League Functions
+
+	get_leagues - get all the leagues from a certain game that the logged in
+			user belongs to, returns a dictionary of YLeague objects
+
+
+	'''
 
 	def get_leagues(self,game):
 		url = 'users;use_login=1/games;game_keys='+game.game_key+'/leagues'
+		leagues = {}
 		data = self.api_call(url)
-		print json.dumps(data,indent=4,separators=(',', ': '))
-		# print data
+		leagues_json = data['fantasy_content']['users']['0']['user'][1] \
+						['games']["0"]['game'][1]['leagues']
+		for i in leagues_json.keys():
+			if i != "count":
+				league_data = leagues_json[i]['league'][0]
+				leagues[league_data['name']] = YLeague(
+						league_data['league_type'], league_data['renewed'], 
+						league_data['end_week'], league_data['name'], 
+						league_data['draft_status'], league_data['league_id'], 
+						league_data['start_week'], league_data['current_week'], 
+						league_data['end_date'], league_data['is_pro_league'], 
+						league_data['start_date'], league_data['league_update_timestamp'], 
+						league_data['edit_key'], league_data['url'], 
+						league_data['renew'], league_data['short_invitation_url'], 
+						league_data['league_chat_id'], league_data['scoring_type'], 
+						league_data['league_key'], league_data['num_teams'], 
+						league_data['weekly_deadline']
+					)
+		return leagues
 
-	def get_nhl_leagues(self):
-		return self.get_league_IDs('nhl')
+	'''
+	Team Functions
 
-	def get_nba_leagues(self):
-		return self.get_league_IDs('nba')
+	get_teams - gets all teams from a certain league, returns a dictionary
+	get_active_teams - gets all teams for the logged in user, returns a dictionary
 
-	def get_nfl_leagues(self):
-		return self.get_league_IDs('nfl')
+	'''
 
-	def get_mlb_leagues(self):
-		return self.get_league_IDs('mlb')
+	def get_teams(self,league):
+		url = 'league/'+league.league_key+'/teams'
+		leagues = {}
+		data = self.api_call(url)
+		print json.dumps(data,sort_keys=True,indent=4,separators=(',', ': '))
+
+		# leagues_json = data['fantasy_content']['users']['0']['user'][1] \
+		# 				['games']["0"]['game'][1]['leagues']
+		# for i in leagues_json.keys():
+		# 	if i != "count":
+		# 		league_data = leagues_json[i]['league'][0]
+		# 		leagues[league_data['name']] = YLeague(
+		# 				league_data['league_type'], league_data['renewed'], 
+		# 				league_data['end_week'], league_data['name'], 
+		# 				league_data['draft_status'], league_data['league_id'], 
+		# 				league_data['start_week'], league_data['current_week'], 
+		# 				league_data['end_date'], league_data['is_pro_league'], 
+		# 				league_data['start_date'], league_data['league_update_timestamp'], 
+		# 				league_data['edit_key'], league_data['url'], 
+		# 				league_data['renew'], league_data['short_invitation_url'], 
+		# 				league_data['league_chat_id'], league_data['scoring_type'], 
+		# 				league_data['league_key'], league_data['num_teams'], 
+		# 				league_data['weekly_deadline']
+		# 			)
+		# return leagues
+
+	def get_active_teams(self):
+		pass
+
+

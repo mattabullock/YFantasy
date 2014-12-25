@@ -12,4 +12,4 @@ TODO:
 * Error handling!
 * Clean up and document
 
-NOTE: When you register an app, wait til 12am PT to try it, otherwise you're wasting your time.
+NOTE: When you register an app, wait a bit to try it, Yahoo has issues with their YDN a lot.

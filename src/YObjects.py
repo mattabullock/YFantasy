@@ -20,7 +20,7 @@ class YGame:
 '''
 YLeague - represents a Yahoo Fantasy League, contains attributes of the league
 '''
-class YLeague(object):
+class YLeague:
 
 	def __init__(self,league_type,renewed,end_week,name,draft_status,league_id,
 					start_week,current_week,end_date,is_pro_league,start_date,
@@ -49,5 +49,16 @@ class YLeague(object):
 		self.weekly_deadline = weekly_deadline
 
 	def __str__(self):
-
 		return self.name
+
+'''
+YTeam - represents a Yahoo Fantasy Team
+'''
+
+class YTeam:
+
+	def __init__():
+		pass
+
+	def __str__():
+		pass

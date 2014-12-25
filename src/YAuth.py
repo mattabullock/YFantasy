@@ -1,6 +1,6 @@
 import webbrowser
 import json
-from rauth import OAuth1Service
+from rauth import OAuth1Service, OAuth1Session
 from rauth.oauth import HmacSha1Signature
 from rauth.service import PROCESS_TOKEN_ERROR
 import sys
@@ -21,11 +21,13 @@ class YAuth:
 		f = open('credentials.json')
 		return json.load(f)
 
-	def update_credentials(self,req_tok,req_tok_sec,verifier):
+	def update_credentials(self,req_tok="",req_tok_sec="",verifier="",access_token="",access_token_secret=""):
 		f = open('credentials.json','w')
-		self.creds['request_token'] = req_tok
-		self.creds['request_token_secret'] = req_tok_sec
-		self.creds['verifier'] = verifier
+		if req_tok != "": self.creds['request_token'] = req_tok
+		if req_tok_sec != "": self.creds['request_token_secret'] = req_tok_sec
+		if verifier != "": self.creds['verifier'] = verifier
+		if access_token != "": self.creds['access_token'] = access_token
+		if access_token_secret != "": self.creds['access_token_secret'] = access_token_secret
 		f.write(json.dumps(self.creds,sort_keys=True,indent=4,separators=(',', ': ')))
 
 	def authorize(self):
@@ -41,6 +43,7 @@ class YAuth:
 		    base_url=BASE_URL,
 		    signature_obj=HmacSha1Signature
 		)
+		print dir(yahoo)
 
 		if 'verifier' not in self.creds:
 			request_token, request_token_secret = \
@@ -48,21 +51,34 @@ class YAuth:
 			authorize_url = yahoo.get_authorize_url(request_token)
 			webbrowser.open(authorize_url)
 			verifier = raw_input("Input code given: ")
-			self.update_credentials(request_token,request_token_secret,verifier)
-		while True:
-			try:
-				session = yahoo.get_auth_session(
-								self.creds['request_token'], 
-								self.creds['request_token_secret'],
-								data={'oauth_verifier': self.creds['verifier']}
-							)
-				break
-			except KeyError as e:
-				if "oauth_problem=token_rejected" in e.message:
-					request_token, request_token_secret = \
-						yahoo.get_request_token(params={'oauth_callback': CALLBACK_URL,})
-					authorize_url = yahoo.get_authorize_url(request_token)
-					webbrowser.open(authorize_url)
-					verifier = raw_input("Input code given: ")
-					self.update_credentials(request_token,request_token_secret,verifier)
+			access_token, access_token_secret = yahoo.get_access_token(
+					request_token,
+					request_token_secret,
+					data={'oauth_verifier': verifier}
+				)
+			self.update_credentials(request_token,request_token_secret,verifier,access_token,access_token_secret)
+		try:
+			session = OAuth1Session(
+					self.creds['consumer_key'],
+					self.creds['consumer_secret'],
+					access_token=self.creds['access_token'],
+					access_token_secret=self.creds['access_token_secret']
+				)
+		except KeyError as e:
+			print e
+			if 'oauth_verifier_invalid' in e.message:
+				pass
+			elif "oauth_problem=token_rejected" in e.message:
+				access_token, access_token_secret = yahoo.get_access_token(
+							self.creds['request_token'], 
+							self.creds['request_token_secret'],
+							data={'oauth_token': self.creds['access_token']}
+						)
+				self.update_credentials(access_token=access_token,access_token_secret=access_token_secret)
+				session = OAuth1Session(
+					self.creds['consumer_key'],
+					self.creds['consumer_secret'],
+					access_token=access_token,
+					access_token_secret=access_token_secret
+				)
 		return session
