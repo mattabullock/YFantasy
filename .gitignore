@@ -56,3 +56,4 @@ target/
 #created by me
 *.json
 src/output
+*.glue

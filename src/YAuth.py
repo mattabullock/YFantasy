@@ -1,8 +1,8 @@
 import webbrowser
 import json
 from rauth import OAuth1Service, OAuth1Session
+from rauth.utils import parse_utf8_qsl
 from rauth.oauth import HmacSha1Signature
-from rauth.service import PROCESS_TOKEN_ERROR
 import sys
 
 GET_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_token/'
@@ -16,24 +16,58 @@ class YAuth:
 
 	def __init__(self):
 		self.creds = self.read_credentials()
+		self.srvc = None
 
 	def read_credentials(self):
 		f = open('credentials.json')
 		return json.load(f)
 
-	def update_credentials(self,req_tok="",req_tok_sec="",verifier="",access_token="",access_token_secret=""):
+	def update_credentials(self,access_token="",access_token_secret="",session_handle=""):
 		f = open('credentials.json','w')
-		if req_tok != "": self.creds['request_token'] = req_tok
-		if req_tok_sec != "": self.creds['request_token_secret'] = req_tok_sec
-		if verifier != "": self.creds['verifier'] = verifier
 		if access_token != "": self.creds['access_token'] = access_token
 		if access_token_secret != "": self.creds['access_token_secret'] = access_token_secret
+		if session_handle != "": self.creds['session_handle'] = session_handle
 		f.write(json.dumps(self.creds,sort_keys=True,indent=4,separators=(',', ': ')))
+		f.close()
+
+	def get_access_token(self):
+		raw_token = self.srvc.get_raw_access_token(
+				self.creds['request_token'],
+				self.creds['request_token_secret'],
+				data={'oauth_verifier': self.creds['verifier']}
+			)
+		token_data = parse_utf8_qsl(raw_token.content)
+		access_token = token_data['oauth_token']
+		access_token_secret = token_data['oauth_token_secret']
+		session_handle = token_data['oauth_session_handle']
+		self.update_credentials(
+			access_token=access_token,
+			access_token_secret=access_token_secret,
+			session_handle=session_handle
+		)
+		session = self.srvc.get_session(
+				(self.creds['access_token'],self.creds['access_token_secret'])
+			)
+
+	def renew_access_token(self):
+		access_token, access_token_secret = self.srvc.get_access_token(
+				self.creds['access_token'], 
+				self.creds['access_token_secret'],
+				data={'oauth_session_handle': self.creds['session_handle']}
+			)
+		self.update_credentials(
+			access_token=access_token,
+			access_token_secret=access_token_secret,
+		)
+		session = self.srvc.get_session(
+				(self.creds['access_token'],self.creds['access_token_secret'])
+			)
+		return session
 
 	def authorize(self):
 
 		# Get a real consumer key & secret from https://dev.twitter.com/apps/new
-		yahoo = OAuth1Service(
+		self.srvc = OAuth1Service(
 		    name='yahoo',
 		    consumer_key=self.creds['consumer_key'],
 		    consumer_secret=self.creds['consumer_secret'],
@@ -43,42 +77,32 @@ class YAuth:
 		    base_url=BASE_URL,
 		    signature_obj=HmacSha1Signature
 		)
-		print dir(yahoo)
 
-		if 'verifier' not in self.creds:
+		if 'session_handle' not in self.creds:
 			request_token, request_token_secret = \
-				yahoo.get_request_token(params={'oauth_callback': CALLBACK_URL,})
-			authorize_url = yahoo.get_authorize_url(request_token)
+				self.srvc.get_request_token(params={'oauth_callback': CALLBACK_URL,})
+			authorize_url = self.srvc.get_authorize_url(request_token)
 			webbrowser.open(authorize_url)
 			verifier = raw_input("Input code given: ")
-			access_token, access_token_secret = yahoo.get_access_token(
-					request_token,
-					request_token_secret,
-					data={'oauth_verifier': verifier}
-				)
-			self.update_credentials(request_token,request_token_secret,verifier,access_token,access_token_secret)
-		try:
-			session = OAuth1Session(
-					self.creds['consumer_key'],
-					self.creds['consumer_secret'],
-					access_token=self.creds['access_token'],
-					access_token_secret=self.creds['access_token_secret']
-				)
-		except KeyError as e:
-			print e
-			if 'oauth_verifier_invalid' in e.message:
-				pass
-			elif "oauth_problem=token_rejected" in e.message:
-				access_token, access_token_secret = yahoo.get_access_token(
-							self.creds['request_token'], 
-							self.creds['request_token_secret'],
-							data={'oauth_token': self.creds['access_token']}
-						)
-				self.update_credentials(access_token=access_token,access_token_secret=access_token_secret)
-				session = OAuth1Session(
-					self.creds['consumer_key'],
-					self.creds['consumer_secret'],
-					access_token=access_token,
-					access_token_secret=access_token_secret
-				)
+			try:
+				session = self.get_access_token()
+			except KeyError as e:
+				if 'oauth_verifier_invalid' in e.message:
+					print "Verifier invalid."
+				elif "oauth_problem=token_rejected" in e.message:
+					print "Token rejected."
+				elif "oauth_problem=token_expired" in e.message:
+					print "Token expired."
+				sys.exit(-1)
+		else:
+			try:
+				session = self.renew_access_token()
+			except KeyError as e:
+				if 'oauth_verifier_invalid' in e.message:
+					print "Verifier invalid."
+				elif "oauth_problem=token_rejected" in e.message:
+					print "Token rejected."
+				elif "oauth_problem=token_expired" in e.message:
+					print "Token expired."
+				sys.exit(-1)
 		return session

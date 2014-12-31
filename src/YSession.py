@@ -2,17 +2,16 @@ from YAuth import YAuth
 from YObjects import YGame, YLeague
 import json
 
-BASE_URL = 'http://fantasysports.yahooapis.com/fantasy/v2/'
 
 class YSession:
 
 	def __init__(self):
 		#set up session variable
-		self.session = YAuth().authorize()
+		self.auth = YAuth()
+		self.session = self.auth.authorize()
 
 	def api_call(self,url):
-		full_url = BASE_URL + url
-		return json.loads(self.session.get(full_url, params={'format': 'json'}).content)
+		return json.loads(self.session.get(url, params={'format': 'json'}).content)
 
 	'''
 	Game Functions
@@ -50,6 +49,7 @@ class YSession:
 	def get_active_games(self):
 		data = self.api_call('users;use_login=1/games')
 		games = {}
+		print data
 		games_json = data['fantasy_content']['users']['0']['user'][1]['games']
 		for i in games_json.keys():
 			if i != "count":
